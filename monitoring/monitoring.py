@@ -59,7 +59,7 @@ class DriftMonitor:
 
             # 3. Fetch only the new records using exact row slicing
             new_data = pd.read_sql(
-                f'SELECT * FROM "LeadScoring" ORDER BY id LIMIT {new_records_count} OFFSET {self.reference_length}',
+                f'SELECT * FROM "LeadScoring"  ORDER BY ctid  LIMIT {new_records_count}  OFFSET {self.reference_length}',
                 self.engine
             )
 
@@ -128,6 +128,7 @@ class DriftMonitor:
 if __name__ == "__main__":
     try:
         monitor = DriftMonitor()
+        print("monitoring drift started inside the monitoring.py")
         if monitor.continuous_monitoring():
             sys.exit(42)  # Special exit code for drift detected
         sys.exit(0)

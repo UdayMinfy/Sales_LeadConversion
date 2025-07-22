@@ -25,18 +25,28 @@ def force_fail_dag(context):
     dag_run = context['dag_run']
     dag_run.set_state('failed')  
 
-def monitor_drift():
+'''def monitor_drift():
     """Drift detection with explicit success/failure states"""
+    print("called the monitor_drift in the dag file")
     try:
         # Start monitoring process
-        monitor_proc = subprocess.Popen(
-            ["python", "/opt/airflow/monitoring/monitoring.py"],
+        #monitor_proc = subprocess.Popen(
+        #    ["python", "/opt/airflow/monitoring/monitoring.py"],
+        #    stdout=subprocess.PIPE,
+        #    stderr=subprocess.STDOUT,
+        #    text=True,
+        #    bufsize=1
+        #)
+        with subprocess.Popen(
+            [sys.executable, "-u", "/opt/airflow/monitoring/monitoring.py"],
             stdout=subprocess.PIPE,
             stderr=subprocess.STDOUT,
             text=True,
             bufsize=1
-        )
-        
+        ) as monitor_proc:
+            for line in monitor_proc.stdout:
+                print(line.strip())  # this will be shown in Airflow logs        
+        print("Subprocess finished.")
         # Stream output and watch for drift
         flask_proc = None
         drift_detected = False
@@ -84,8 +94,61 @@ def monitor_drift():
             
     except Exception as e:
         print(f"⚠️ Critical monitoring failure: {e}")
-        raise
+        raise'''
+def monitor_drift(): 
+    """Drift detection with explicit success/failure states"""
+    print("📡 Called the monitor_drift in the DAG file")
+    try:
+        # Start monitoring process
+        monitor_proc = subprocess.Popen(
+            [sys.executable, "-u", "/opt/airflow/monitoring/monitoring.py"],
+            stdout=subprocess.PIPE,
+            stderr=subprocess.STDOUT,
+            text=True,
+            bufsize=1
+        )
 
+        # Read output and check for drift
+        stdout, _ = monitor_proc.communicate()
+        print(stdout)  # Log full output to Airflow logs
+
+        drift_detected = "DRIFT_DETECTED" in stdout
+        flask_proc = None
+
+        if drift_detected:
+            print("🔄 Drift detected - initiating model update cycle...")
+
+            # Find and stop Flask process
+            for proc in psutil.process_iter(['pid', 'cmdline']):
+                try:
+                    if (proc.info['cmdline'] and 
+                        'python' in proc.info['cmdline'][0] and 
+                        '/opt/airflow/deployment/flask_app/app.py' in ' '.join(proc.info['cmdline'])):
+                        flask_proc = proc
+                        break
+                except (psutil.NoSuchProcess, psutil.AccessDenied):
+                    continue
+
+            if flask_proc:
+                print(f"🛑 Stopping Flask (PID: {flask_proc.pid})")
+                flask_proc.terminate()
+                try:
+                    flask_proc.wait(timeout=5)
+                except psutil.TimeoutExpired:
+                    flask_proc.kill()
+
+        # Check subprocess result
+        if monitor_proc.returncode != 0 and not drift_detected:
+            raise RuntimeError(f"Monitoring failed with exit code {monitor_proc.returncode}")
+
+        # Return explicit success state
+        if drift_detected:
+            print("✅ Successfully detected drift - triggering pipeline refresh")
+            return True
+
+    except Exception as e:
+        print(f"⚠️ Critical monitoring failure: {e}")
+        raise
 
 with DAG(
     "ml_pipeline_dag_updated",
@@ -107,19 +170,16 @@ with DAG(
     preprocess = BashOperator(
         task_id="preprocessing",
         bash_command="python /opt/airflow/preprocessing/pipelines.py",
-        on_failure_callback=force_fail_dag,
     )
 
     train_model = BashOperator(
         task_id="train_model",
         bash_command="python /opt/airflow/main.py",
-        on_failure_callback=force_fail_dag,
     )
 
     predict = BashOperator(
         task_id="predict",
         bash_command="python /opt/airflow/ml/predict.py",
-        on_failure_callback=force_fail_dag,
     )
 
     # Concurrent endpoints

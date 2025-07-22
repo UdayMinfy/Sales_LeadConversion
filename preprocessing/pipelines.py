@@ -9,7 +9,7 @@ def get_cleaning_pipeline():
         ('cleaner', DataCleaningPipeline())
     ])
 
-raw_df=pd.read_csv("/opt/airflow/data/raw/LeadScoring.csv")
+raw_df=pd.read_csv("/opt/airflow/data/raw/Lead Scoring.csv")
 
 cleaning_pipeline = get_cleaning_pipeline()
 clean_df = cleaning_pipeline.fit_transform(raw_df)

@@ -1,0 +1,34 @@
+version: "3.8"
+
+services:
+  airflow:
+    image: apache/airflow:2.7.3
+    build:
+      context: .
+      dockerfile: Dockerfile
+    environment:
+      - AIRFLOW__CORE__EXECUTOR=LocalExecutor
+      - AIRFLOW__DATABASE__SQL_ALCHEMY_CONN=postgresql+psycopg2://postgres:newpassword@host.docker.internal:5432/mydb5
+      - AIRFLOW__WEBSERVER__EXPOSE_CONFIG=True
+    ports:
+      - "8080:8080"
+      - "5000:5000"
+      - "5001:5001"  # Flask app exposed
+    volumes:
+      - ./dags:/opt/airflow/dags
+      - ./ml:/opt/airflow/ml
+      - ./data_ingestion:/opt/airflow/data_ingestion
+      - ./preprocessing:/opt/airflow/preprocessing
+      - ./data:/opt/airflow/data
+      - "C:/Users/Minfy/Documents/Minfy 2nd Month Data+AI/SalesConversions/mlruns:/opt/airflow/mlruns"  # ✅ Mount local MLflow folder
+      - ./main.py:/opt/airflow/main.py
+      - ./deployment:/opt/airflow/deployment
+      - ./monitoring:/opt/airflow/monitoring
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+    command: >
+      bash -c "airflow webserver & airflow scheduler"
+#airflow webserver & airflow scheduler"
+# &&airflow db migrate
+#               airflow users create --username admin --password admin --firstname Admin --lastname User --role Admin --email admin@example.com &&
+ #              airflow webserver & airflow scheduler"

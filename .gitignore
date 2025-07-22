@@ -1,0 +1,14 @@
+# Ignore MLflow experiment logs
+mlruns/
+
+# Ignore raw and artifact data
+data/artifacts/
+data/raw/
+
+# Ignore specific pickle files
+data/preprocessing_pipeline.pkl
+preprocessing/fitted_pipeline.pkl
+
+logs/
+
+
